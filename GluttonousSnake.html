@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+
+	<!-- <script type="text/javascript" src="./js/Ball.js"></script> -->
+
+	<style type="text/css">
+	*{
+		margin: 0;
+		padding: 0;
+	}
+	#wrapper{
+		width: 1200px;
+		height: 500px;
+		margin: 50px auto;
+		background-color: lightcyan;
+	}
+
+	</style>
+</head>
+<body>
+	<div id="wrapper">
+		<canvas id="myCanvas" width="1200" height="500" style="border:1px solid #c3c3c3;">
+			Your browser does not support the canvas element.
+		</canvas>
+	</div>
+	<script>
+	//构建蛇的正方形矩形
+	function Rect(options){
+		this._init(options);
+	}
+	Rect.prototype = {
+		constructor:Rect,
+		_init:function(options){
+			options = options || {};
+			this.x = options.x;
+			this.y = options.y;
+			//矩形的宽高一样
+			this.wh = options.wh;
+			this.fillStyle = options.fillStyle;
+		},
+		//渲染
+		render:function(ctx){
+			ctx.beginPath();
+			ctx.fillStyle = this.fillStyle;
+			ctx.fillRect(this.x, this.y, this.wh, this.wh);
+		}
+	}
+	</script>
+	<script>
+	//构建蛇对象
+	function Snake(options){
+		this._init(options);
+	}
+	Snake.prototype = {
+		constructor:Snake,
+		_init:function(options){
+			options = options || {};
+			//蛇对象的宽高就是矩形的宽高,外部options传入
+			this.wh = options.wh;
+			// this.fillStyle = options.fillStyle;
+			// this.headColor = options.headColor;
+			//创建一个数组,用来保存创建出的矩形
+			this.mySnake = [];
+			//要创建的矩形的个数
+			for(var i = 0; i < 5; i++){
+				//调用上面的Rect函数创建5个矩形
+				var rect = new Rect({
+					//每个矩形的起始X位置就是前面一个的尾巴,
+					//第一个就是0*this.wh就是0,第二个是1*this.wh
+					x : i*this.wh,
+					//起始位置y轴数据不变
+					y : 0,
+					//矩形的宽高一样
+					wh :this.wh,
+					//矩形填色,外部传入的bodycolor
+					fillStyle : bodyColor
+					// headColor : this.headcolor
+				});
+				//把创建出来的5个矩形添加到前面声明的mySnake数组中,最后一个保存在最前面
+				this.mySnake.splice(0,0,rect);
+			}
+			//找到蛇的头部
+			this.snakeHead = this.mySnake[0];
+			//修改蛇头部的fillStyle属性
+			this.snakeHead.fillStyle = options.headColor;
+
+		},
+		//渲染所有rect对象
+		render:function(ctx){
+			for(var i = 0 ; i < this.mySnake.length ; i++){
+				var snakeBody = this.mySnake[i];
+				//这里调用的render是上面Rect的render
+				snakeBody.render(ctx);
+			}
+		},
+		//大蛇要移动了!!!创建一个移动的函数
+		//移动视觉效果,在头部的后面插入一个rect,在尾巴再切掉一个rent
+		move:function(){
+			//创建要插入的那个rect,位置要在原来的头部那儿,把头部挤一边儿去,所以先得到头部的起始位置
+			var x = this.snakeHead.x;
+			var y = this.snakeHead.y;
+			var rect = new Rect({
+				x : x,
+				y : y,
+				wh :this.wh,
+				fillStyle : bodyColor
+
+			});//为什么这里不需要render?
+			//然后把创建出来的rect插入数组中,为了保证头部还在,插在下标1的位置上
+			this.mySnake.splice(1,0,rect);
+			//接着处理头部的方向,修改头部的X和Y的值
+			if (this.direction == "top") {
+				//方向往上走 Y的值减少
+				this.snakeHead.y -= this.wh;
+			}else if (this.direction == "bottom") {
+				//方向往下走 Y的值增大
+				this.snakeHead.y += this.wh;
+			}else if (this.direction == "left") {
+				this.snakeHead.x -= this.wh;
+			}else{
+				this.snakeHead.x += this.wh;
+			};
+			/*
+				接着处理蛇尾移出,先要判断什么时候移出什么时候不移除
+				当蛇在移动的时候没有吃到食物,身体不变长,就一直在移除
+				当吃到食物,食物添加到身体,就不移除
+				先去创建食物对象
+				再去创建吃到食物方法
+				再做这一步
+			*/
+			var eaten = this._eat();
+			//当蛇在移动的时候没有吃到食物,身体不变长,就一直在移除
+			if (!eaten) {
+				this.mySnake.pop();//移除数组最后一位
+			}else{
+				food = this._creatFood();
+			}
+			//设置死亡条件
+			if (this._isDead()) {
+				clearInterval(timer);
+			};
+
+		},
+		_isDead:function(){
+			//设置撞墙挂
+			if (this.snakeHead.x > canvas.width || this.snakeHead.x < 0 || this.snakeHead.y > canvas.height || this.snakeHead.y < 0) {
+				return true;
+			};
+			//撞身体
+			for(var i = 1;i < this.mySnake.length;i++){
+				var body = this.mySnake[i];
+				if(this.snakeHead.x == body.x && this.snakeHead.y == body.y){
+					return true
+				}
+			}
+			//上面条件都不满足 继续走
+			return false;
+		},
+		//创建食物对象
+		_creatFood:function(){
+			//食物也是rect,单个
+			//设置食物的位置,要随机
+			//先找到整个canvas的宽高除以小rect宽高的数据
+			var rangeX = parseInt(canvas.width/this.wh);
+			var rangeY = parseInt(canvas.height/this.wh);
+			//声明食物的XY,获取到的所有可以除尽wh的数字拿来随机
+			var x ;
+			var y ;
+			//现在要让食物不要跟蛇身体撞上
+			var isSame = true;
+			while(isSame){
+				x = parseInt(Math.random()*rangeX)*this.wh;
+				y = parseInt(Math.random()*rangeY)*this.wh;
+				isSame = false;
+				for (var i = 0; i < this.mySnake.length; i++) {
+					var rect = this.mySnake[i];
+					if (rect.x == x && rect.y == y) {
+						isSame = true;
+					};
+				};
+			}
+			var food = new Rect({
+				x : x,
+				y : y,
+				wh :this.wh,
+				fillStyle : this.bodyColor
+			});
+			return food;
+		},
+		_eat:function(){
+			if (this.snakeHead.x == food.x && this.snakeHead.y == food.y) {
+				return true;//吃掉了
+			}else{
+				return false;//没吃到
+			}
+		}
+	}
+
+	</script>
+	<script type="text/javascript">
+	var canvas = document.getElementById("myCanvas");
+	var ctx = canvas.getContext("2d");
+	var colors = ["#F08080","PaleTurquoise","LightSlateBlue","Plum","PaleGreen"];
+	var headColor;
+	var bodyColor;
+	var colorIsSame = true;
+	var food = {};
+	while(colorIsSame){
+		bodyColor = colors[parseInt(Math.random()*colors.length)];
+		headColor = colors[parseInt(Math.random()*colors.length)];
+		// strokeColor = colors[parseInt(Math.random()*colors.length)];
+		colorIsSame = false;
+		if(headColor == bodyColor){
+			colorIsSame = true;
+		}
+	}
+	//画一只蛇
+	var snake = new Snake({
+		wh : 20,
+		fillStyle : bodyColor,
+		headColor : headColor
+	});
+	snake.render(ctx);
+	//画食物?
+	var food = {};
+	function createFood(){
+		// 创建一个食物
+		var x = food.x || 100;
+		var y = food.y || 100;
+		food = new Rect({
+			x : x,
+			y : y,
+			wh : 20,
+			fillStyle : "pink"
+		});
+		food.render(ctx);
+	}
+	//设置帧数
+	var fps = 10;
+
+	//现在去设置一个定时器 让蛇动起来
+	var timer = setInterval(function(){
+		clearCanvas();
+		createFood();
+		snake.move();
+		snake.render(ctx);
+	}, 1000/fps);
+	//控制蛇移动
+	window.onkeydown = function(event){
+		switch(event.key){
+			case 'w':
+			if(snake.direction !== 'bottom'){
+				snake.direction="top";
+			}
+			break;
+			case 's':
+			if(snake.direction !== 'top'){
+				snake.direction="bottom";
+			}
+			break;
+			case 'a':
+			if(snake.direction !== 'right'){
+				snake.direction="left";
+			}
+			break;
+			case 'd':
+			if(snake.direction !== 'left'){
+				snake.direction="right";
+			}
+			break;
+		}
+	}
+
+
+	//清空画布
+	function clearCanvas(){
+		canvas.width = canvas.width;
+		canvas.height = canvas.height;
+	}
+
+
+	</script>
+
+
+
+
+</body>
+</html>
